@@ -6,7 +6,6 @@ import { BaseAgent } from "./BaseAgent"
 import { RegisterCredentialDefinitionReturnStateFinished } from "@credo-ts/anoncreds"
 import { connect } from "ngrok"
 import { IndyVdrRegisterCredentialDefinitionOptions, IndyVdrRegisterSchemaOptions } from "@credo-ts/indy-vdr"
-import { uuid } from "@credo-ts/core/build/utils/uuid"
 
 export enum Output {
   NoConnectionRecordFromOutOfBand = `\nNo connectionRecord has been created from invitation\n`,
@@ -16,33 +15,33 @@ export enum Output {
   Exit = 'Shutting down agent...\nExiting...',
 }
 
-const seed = `bguniversityissuerdidseed0000001` // What you input on bcovrin. Should be kept secure in production!
-const unqualifiedIndyDid = `5VMhy9wGv5MzWCGj6Uspeg` // will be returned after registering seed on bcovrin
+const seed = `empl12issuerdidseed0000000000000` // What you input on bcovrin. Should be kept secure in production!
+const unqualifiedIndyDid = `RYwJSsXhmwgvT1hivFda9S` // will be returned after registering seed on bcovrin
 const universityDid = `did:indy:bcovrin:test:${unqualifiedIndyDid}`
 
-export class University extends BaseAgent {
+export class Employer extends BaseAgent {
   public outOfBandId?: string
   public credentialDefinition?: RegisterCredentialDefinitionReturnStateFinished
   public anonCredsIssuerId?: string
 
   public constructor(port: number, name: string, endpoint: string) {
-    const connectionImageUrl = "https://img.freepik.com/premium-vector/campus-collage-university-education-logo-design-template_7492-59.jpg";
+    const connectionImageUrl = "https://atelierlks.com/wp-content/uploads/2020/10/99gen_arc.png";
     super({ port, name, endpoint, connectionImageUrl })
   }
 
-  public static async build(): Promise<University> {
-    console.log(`Building Univeristy Agent`)
-    const port: number = 3001;
+  public static async build(): Promise<Employer> {
+    console.log(`Building Employer Agent`)
+    const port: number = 4001;
     const endpoint = await connect({ addr: port, authtoken_from_env: true });
     console.log(`NgROK Endpoint: ${endpoint}`);
-    const universityAgent = new University(port, 'BG University', endpoint)
+    const universityAgent = new Employer(port, 'BG Employer', endpoint)
     await universityAgent.initializeAgent();
-    console.log(`Successfully Initialised Univeristy Agent`)
+    console.log(`Successfully Initialised Employer Agent`)
     return universityAgent
   }
 
   public async importDid() {
-    console.log('University - Importing DID')
+    console.log('Employer - Importing DID')
     // NOTE: we assume the did is already registered on the ledger, we just store the private key in the wallet
     // and store the existing did in the wallet
     // indy did is based on private key (seed)
@@ -95,7 +94,7 @@ export class University extends BaseAgent {
       throw new Error(Output.MissingConnectionRecord)
     }
 
-    console.log('Waiting for Alice to finish connection...')
+    console.log('Waiting for other party to finish connection...')
 
     const getConnectionRecord = (outOfBandId: string) =>
       new Promise<ConnectionRecord>((resolve, reject) => {
@@ -183,7 +182,7 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
     }
 
     const schemaTemplate = {
-      name: 'AICTE_INDIA_DEGREE_SCHEMA_BG' + uuid(),
+      name: 'AICTE_INDIA_DEGREE_SCHEMA_BG',
       version: '1.0.0',
       attrNames: ['registration_number', 'first_name', 'last_name', 'degree', 'status', 'year', 'average'],
       issuerId: this.anonCredsIssuerId,
@@ -275,13 +274,13 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
   }
 
 
-  private async newProofAttribute() {
+  private async newProofAttribute(credentialDefinitionId: string) {
     const proofAttribute = {
       name: {
-        name: 'name',
+        name: 'average',
         restrictions: [
           {
-            cred_def_id: this.credentialDefinition?.credentialDefinitionId,
+            cred_def_id: credentialDefinitionId,
           },
         ],
       },
@@ -290,24 +289,38 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
     return proofAttribute
   }
 
-  public async sendProofRequest() {
-    const connectionRecord = await this.getConnectionRecord()
-    const proofAttribute = await this.newProofAttribute()
+  private async newProofAttribute1(credentialDefinitionId: string) {
+    const proofAttribute = {
+      name: {
+        name: 'average',
+        restrictions: [
+          {
+            cred_def_id: credentialDefinitionId,
+          },
+        ],
+      },
+    }
 
-    await this.agent.proofs.requestProof({
+    return proofAttribute
+  }
+
+  public async sendProofRequest(connectionId: string, credentialDefinitionId: string) {
+    // const connectionRecord = await this.getConnectionRecord()
+    const proofAttribute = await this.newProofAttribute(credentialDefinitionId)
+
+    const proofRequest = await this.agent.proofs.requestProof({
       protocolVersion: 'v2',
-      connectionId: connectionRecord.id,
+      connectionId: connectionId,
       proofFormats: {
         anoncreds: {
-          name: 'proof-request',
+          name: 'degree_proof-request',
           version: '1.0',
           requested_attributes: proofAttribute,
         },
       },
     })
-    // this.ui.updateBottomBar(
-    //   `\nProof request sent!\n\nGo to the Alice agent to accept the proof request\n\n${Color.Reset}`
-    // )
+    
+    return proofRequest;
   }
 
   public async sendMessage(message: string) {
@@ -341,9 +354,5 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
       await this.agent.proofs.deleteById(proof.id);
     }
   }
-}
-
-function importDid() {
-  throw new Error("Function not implemented.")
 }
 

@@ -51,11 +51,13 @@ export class BaseAgent {
   public name: string
   public config: InitConfig
   public agent: DemoAgent
+  public connectionImageUrl: string
 
-   public constructor({ port, name, endpoint }: { port: number; name: string; endpoint: string }) {
+   public constructor({ port, name, endpoint, connectionImageUrl }: { port: number; name: string; endpoint: string; connectionImageUrl: string }) {
     this.name = name
     this.port = port
     this.endpoint = endpoint
+    this.connectionImageUrl = connectionImageUrl
 
     const config = {
       label: name,
@@ -64,6 +66,7 @@ export class BaseAgent {
         key: name,
       },
       endpoints: [endpoint],
+      connectionImageUrl : connectionImageUrl,
     } satisfies InitConfig
 
     this.config = config

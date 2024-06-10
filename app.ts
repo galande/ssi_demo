@@ -4,6 +4,7 @@ import express, { Express, Request, Response, } from "express";
 // import { initializeBobAgent, receiveInvitation } from "./bobAgent";
 import { cleanupAgent } from "./src/common";
 import { University } from "./src/universityAgent";
+import { Employer } from "./src/employerAgent";
 
 const app: Express = express();
 
@@ -13,7 +14,7 @@ const port = 8006;
 const run = async () => {
     
     console.log("============Starting Application ====================")
-    const university = await startAgents();
+    const {university, employer} = await startAgents();
 
     app.listen(port, () => {
         console.log(`Server listning on port ${port}`);
@@ -90,7 +91,47 @@ const run = async () => {
         
         res.status(200).send(response);
     });
+
+    app.get("/university/reset", async (req: Request, res: Response) => {
+        console.log("university - Creating new Invitation");
+       
+        await university.reset();
+        res.status(200).send("university - Reset Successful"); 
+    });
     /*================================ Bob Endpoints ==========================================*/
+
+    app.get("/employer/createInvitation", async (req: Request, res: Response) => {
+        console.log("employer - Creating new Invitation");
+       
+        const newInvitation = await employer.getConnectionInvite()
+        console.log('employer - Listening for connection changes...');
+        employer.setupConnectionListener(newInvitation.outOfBand, () =>
+            console.log('employer - We now have an active connection to use in the following tutorials')
+        );
+
+        res.status(200).send(newInvitation); 
+    });
+
+    app.get("/employer/connections", async (req: Request, res: Response) => {
+        const allConnections = await employer.getAllConnectionRecord();
+        res.status(200).send(allConnections);
+    });
+
+    app.post("/employer/proof", async (req: Request, res: Response) => {
+        console.log("employer - Creating new Invitation");
+       
+        const connectionId = req.body.connectionId;
+        const credDefId = req.body.credDefId;
+        const response = await employer.sendProofRequest(connectionId, credDefId);
+        res.status(200).send(response); 
+    });
+
+    app.get("/employer/reset", async (req: Request, res: Response) => {
+        console.log("employer - Creating new Invitation");
+       
+        await employer.reset();
+        res.status(200).send("employer Reset Successful"); 
+    });
 
     // app.get("/bob/initialize", async (req: Request, res: Response) => {
     //     console.log("Initialising Bob Agent manually");
@@ -144,7 +185,11 @@ const run = async () => {
 const startAgents = async () => {
     const university = await University.build();
     await university.importDid();
-    return university;
+
+    const employer = await Employer.build();
+    await employer.importDid();
+
+    return { university, employer };
 };
 
 run();

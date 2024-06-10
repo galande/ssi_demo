@@ -29,20 +29,30 @@ const run = async () => {
   
 
     app.get("/university/createInvitation", async (req: Request, res: Response) => {
-        console.log("Creating new Invitation");
+        try {
+            console.log("Creating new Invitation");
        
-        const newInvitation = await university.getConnectionInvite()
-        console.log('Listening for connection changes...');
-        university.setupConnectionListener(newInvitation.outOfBand, () =>
-            console.log('We now have an active connection to use in the following tutorials')
-        );
+            const newInvitation = await university.getConnectionInvite()
+            console.log('Listening for connection changes...');
+            university.setupConnectionListener(newInvitation.outOfBand, () =>
+                console.log('We now have an active connection to use in the following tutorials')
+            );
 
-        res.status(200).send(newInvitation);
+            res.status(200).send(newInvitation);
+        } catch (error: any) {
+            res.status(500).send("Error Occured");
+        }
+        
     });
 
     app.get("/university/connections", async (req: Request, res: Response) => {
-        const allConnections = await university.getAllConnectionRecord();
-        res.status(200).send(allConnections);
+        try {
+            const allConnections = await university.getAllConnectionRecord();
+            res.status(200).send(allConnections);
+        }catch (error: any) {
+            res.status(500).send("Error Occured");
+        }
+        
     });
 
     // app.get("/acme/reset", (req:Request, res:Response) => {
@@ -51,86 +61,125 @@ const run = async () => {
     // });
 
     app.post("/university/schema", async (req:Request, res:Response) => {
-        const response = await university.registerSchema();
-        res.status(200).send(response);
+        try {
+            const response = await university.registerSchema();
+            res.status(200).send(response);
+        }catch (error: any) {
+            res.status(500).send("Error Occured");
+        }
+        
     });
 
     app.post("/university/credDef", async (req:Request, res:Response) => {
-        const schemaId = req.body.schemaId;
+        try {
+            const schemaId = req.body.schemaId;
 
-        if (!schemaId || schemaId == "") {
-            res.status(400).send("Invalid schema ID");
-            return;
+            if (!schemaId || schemaId == "") {
+                res.status(400).send("Invalid schema ID");
+                return;
+            }
+
+            const response = await university.registerCredentialDefinition(schemaId);
+            res.status(200).send(response);
+        }catch (error: any) {
+            res.status(500).send("Error Occured");
         }
-
-        const response = await university.registerCredentialDefinition(schemaId);
-        res.status(200).send(response);
+        
     });
 
     app.post("/university/cred", async (req:Request, res:Response) => {
-        const connectionId = req.body.connectionId;
+        try {
+            const connectionId = req.body.connectionId;
 
-        if (!connectionId || connectionId == "") {
-            res.status(400).send("Invalid connectionId");
-            return;
+            if (!connectionId || connectionId == "") {
+                res.status(400).send("Invalid connectionId");
+                return;
+            }
+    
+            const response = await university.issueCredential( 
+                connectionId, 
+                req.body.credDefId,
+                req.body.registration_number,
+                req.body.first_name,
+                req.body.last_name,
+                req.body.degree,
+                req.body.status, 
+                req.body.year, 
+                req.body.average, 
+            );
+    
+            university.setupCredentialListener(connectionId, (connectionId) => console.log(`Credential accepted by ${connectionId}`))
+            
+            res.status(200).send(response);
+        }catch (error: any) {
+            res.status(500).send("Error Occured");
         }
-
-        const response = await university.issueCredential( 
-            connectionId, 
-            req.body.credDefId,
-            req.body.registration_number,
-            req.body.first_name,
-            req.body.last_name,
-            req.body.degree,
-            req.body.status, 
-            req.body.year, 
-            req.body.average, 
-        );
-
-        university.setupCredentialListener(connectionId, (connectionId) => console.log(`Credential accepted by ${connectionId}`))
-        
-        res.status(200).send(response);
+       
     });
 
     app.get("/university/reset", async (req: Request, res: Response) => {
-        console.log("university - Creating new Invitation");
+        try {
+            console.log("university - Creating new Invitation");
        
-        await university.reset();
-        res.status(200).send("university - Reset Successful"); 
+            await university.reset();
+            res.status(200).send("university - Reset Successful"); 
+        }catch (error: any) {
+            res.status(500).send("Error Occured");
+        }
+        
     });
     /*================================ Bob Endpoints ==========================================*/
 
     app.get("/employer/createInvitation", async (req: Request, res: Response) => {
-        console.log("employer - Creating new Invitation");
+        try {
+            console.log("employer - Creating new Invitation");
        
-        const newInvitation = await employer.getConnectionInvite()
-        console.log('employer - Listening for connection changes...');
-        employer.setupConnectionListener(newInvitation.outOfBand, () =>
-            console.log('employer - We now have an active connection to use in the following tutorials')
-        );
+            const newInvitation = await employer.getConnectionInvite()
+            console.log('employer - Listening for connection changes...');
+            employer.setupConnectionListener(newInvitation.outOfBand, () =>
+                console.log('employer - We now have an active connection to use in the following tutorials')
+            );
 
-        res.status(200).send(newInvitation); 
+            res.status(200).send(newInvitation); 
+        }catch (error: any) {
+            res.status(500).send("Error Occured");
+        }
+        
     });
 
     app.get("/employer/connections", async (req: Request, res: Response) => {
-        const allConnections = await employer.getAllConnectionRecord();
-        res.status(200).send(allConnections);
+        try {
+            const allConnections = await employer.getAllConnectionRecord();
+            res.status(200).send(allConnections);
+        }catch (error: any) {
+            res.status(500).send("Error Occured");
+        }
+        
     });
 
     app.post("/employer/proof", async (req: Request, res: Response) => {
-        console.log("employer - Creating new Invitation");
-       
-        const connectionId = req.body.connectionId;
-        const credDefId = req.body.credDefId;
-        const response = await employer.sendProofRequest(connectionId, credDefId);
-        res.status(200).send(response); 
+        try {
+            console.log("employer - Creating new Invitation");
+        
+            const connectionId = req.body.connectionId;
+            const credDefId = req.body.credDefId;
+            const response = await employer.sendProofRequest(connectionId, credDefId);
+            res.status(200).send(response); 
+        }catch (error: any) {
+            res.status(500).send("Error Occured");
+        }
+        
     });
 
     app.get("/employer/reset", async (req: Request, res: Response) => {
-        console.log("employer - Creating new Invitation");
+        try {
+            console.log("employer - Creating new Invitation");
        
-        await employer.reset();
-        res.status(200).send("employer Reset Successful"); 
+            await employer.reset();
+            res.status(200).send("employer Reset Successful");
+        }catch (error: any) {
+            res.status(500).send("Error Occured");
+        }
     });
 
     // app.get("/bob/initialize", async (req: Request, res: Response) => {

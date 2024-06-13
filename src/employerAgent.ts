@@ -1,5 +1,5 @@
 
-import { Agent, ConnectionEventTypes, ConnectionRecord, ConnectionStateChangedEvent, ConnectionsModule, CredentialEventTypes, CredentialStateChangedEvent, CredentialsModule, DidExchangeState, DidsModule, HttpOutboundTransport, InitConfig, KeyType, OutOfBandRecord, TypedArrayEncoder, V2CredentialProtocol, WsOutboundTransport, utils } from "@credo-ts/core"
+import { Agent, ConnectionEventTypes, ConnectionRecord, ConnectionStateChangedEvent, ConnectionsModule, CredentialEventTypes, CredentialStateChangedEvent, CredentialsModule, DidExchangeState, DidsModule, HttpOutboundTransport, InitConfig, KeyType, OutOfBandRecord, ProofEventTypes, ProofState, ProofStateChangedEvent, TypedArrayEncoder, V2CredentialProtocol, WsOutboundTransport, utils } from "@credo-ts/core"
 
 
 import { BaseAgent } from "./BaseAgent"
@@ -17,7 +17,9 @@ export enum Output {
 
 const seed = `empl12issuerdidseed0000000000000` // What you input on bcovrin. Should be kept secure in production!
 const unqualifiedIndyDid = `RYwJSsXhmwgvT1hivFda9S` // will be returned after registering seed on bcovrin
-const universityDid = `did:indy:bcovrin:test:${unqualifiedIndyDid}`
+const universityDid = `did:indy:bcovrin:test:${unqualifiedIndyDid}`;
+// const INTERVIEW_INVITE_CRED_DEF_ID = "did:indy:bcovrin:test:RYwJSsXhmwgvT1hivFda9S/anoncreds/v0/CLAIM_DEF/895907/latest";
+const INTERVIEW_INVITE_CRED_DEF_ID = "did:indy:bcovrin:test:RYwJSsXhmwgvT1hivFda9S/anoncreds/v0/CLAIM_DEF/895907/Interview_Invite_Card";
 
 export class Employer extends BaseAgent {
   public outOfBandId?: string
@@ -166,9 +168,57 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
       // process.exit(0)
     // }
   })
-
-  
 };
+
+public async setupProofListener (connectionId: string, cb: (...args: any) => void) {
+  this.agent.events.on<ProofStateChangedEvent>(ProofEventTypes.ProofStateChanged, async ({ payload }) => {
+    console.log(payload)
+    cb();
+    if (payload.proofRecord.state == ProofState.PresentationReceived) {
+      console.log(`==============Proof Received-Validating It===================`)
+      await this.agent.proofs.acceptPresentation({proofRecordId : payload.proofRecord.id});
+      const proofData = await this.agent.proofs.getFormatData(payload.proofRecord.id);
+      const receivedProof = proofData.presentation?.anoncreds?.requested_proof.revealed_attr_groups?.name.values
+      const degree = receivedProof?.degree.raw;
+      const average = receivedProof?.average.raw || "";
+      const connectionId = payload.proofRecord.connectionId || "";
+      console.log(`======Connection Id: ${connectionId}`);
+      const connection = await this.agent.connections.getById(connectionId);
+      //Job requirement is "Bachelor Of Engineering" degree and atleast 65% average marks
+      if (degree != "Bachelor Of Engineering" || +average < 65) {
+        this.agent.basicMessages.sendMessage(connection.id, `Sorry, You do not meet the required criteria for this job. Job requirement is "Bachelor Of Engineering" degree and atleast 65% average marks`);
+      } else {
+        this.agent.basicMessages.sendMessage(connection.id, "Congratulations, You have meet the required criteria for this job. We have shared invite with you.");
+        await this.sendInterviewInvite(connectionId);
+      }
+      
+    }
+  })
+};
+
+private async sendInterviewInvite(connectionId : string) {
+  const credentialRecord = await this.agent.credentials.offerCredential({
+    connectionId: connectionId,
+    protocolVersion: 'v2',
+    credentialFormats: {
+      anoncreds: {
+        credentialDefinitionId: INTERVIEW_INVITE_CRED_DEF_ID,
+        attributes: [
+          { name: 'invite_date', value: "01 July 2024" },
+          { name: 'invited_by', value:"HR XYZ" },
+          { name: 'job_id', value: "JOB980877" },
+        ]
+      },
+    },
+  })
+}
+
+
+
+public async getAllProofs() {
+  const allProofs = this.agent.proofs.getAll();
+  return allProofs;
+}
 
   public async setupConnection() {
     await this.getConnectionInvite()
@@ -176,15 +226,15 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
   }
 
 
-  public async registerSchema() {
+  public async registerInterviewInviteSchema() {
     if (!this.anonCredsIssuerId) {
       throw new Error('Missing anoncreds issuerId')
     }
 
     const schemaTemplate = {
-      name: 'AICTE_INDIA_DEGREE_SCHEMA_BG',
+      name: 'BG_Employer_Invite',
       version: '1.0.0',
-      attrNames: ['registration_number', 'first_name', 'last_name', 'degree', 'status', 'year', 'average'],
+      attrNames: ['invite_date', 'invited_by', 'job_id'],
       issuerId: this.anonCredsIssuerId,
     }
     
@@ -216,7 +266,7 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
         credentialDefinition: {
           schemaId,
           issuerId: this.anonCredsIssuerId,
-          tag: 'latest',
+          tag: 'Interview_Invite_Card',
         },
         options: {
           supportRevocation: false,
@@ -292,7 +342,7 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
   private async newProofAttribute1(credentialDefinitionId: string) {
     const proofAttribute = {
       name: {
-        name: 'average',
+        names: ['degree','average'],
         restrictions: [
           {
             cred_def_id: credentialDefinitionId,
@@ -306,7 +356,7 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
 
   public async sendProofRequest(connectionId: string, credentialDefinitionId: string) {
     // const connectionRecord = await this.getConnectionRecord()
-    const proofAttribute = await this.newProofAttribute(credentialDefinitionId)
+    const proofAttribute = await this.newProofAttribute1(credentialDefinitionId)
 
     const proofRequest = await this.agent.proofs.requestProof({
       protocolVersion: 'v2',

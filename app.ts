@@ -159,17 +159,54 @@ const run = async () => {
 
     app.post("/employer/proof", async (req: Request, res: Response) => {
         try {
-            console.log("employer - Creating new Invitation");
+            console.log("employer - Creating new Proof request");
         
             const connectionId = req.body.connectionId;
             const credDefId = req.body.credDefId;
             const response = await employer.sendProofRequest(connectionId, credDefId);
+            employer.setupProofListener(connectionId, () => {console.log("=========Proof State Channged ========")})
             res.status(200).send(response); 
         }catch (error: any) {
             res.status(500).send("Error Occured");
         }
         
     });
+
+    app.get("/employer/proofs", async (req: Request, res: Response) => {
+        try {
+            console.log("employer - Creating new Proof request");
+        
+            const response = await employer.getAllProofs();
+            res.status(200).send(response); 
+        }catch (error: any) {
+            res.status(500).send("Error Occured");
+        }
+        
+    });
+
+    app.post("/employer/schema", async (req: Request, res: Response) => {
+        try {
+            console.log("employer - Creating new Invite Schema");
+        
+            const response = await employer.registerInterviewInviteSchema();
+            res.status(200).send(response); 
+        }catch (error: any) {
+            res.status(500).send("Error Occured");
+        }
+        
+    });
+
+    app.post("/employer/credDef", async (req: Request, res: Response) => {
+        try {
+            console.log("employer - Creating new credential definition for Invite");
+            const schemaId = req.body.schemaId;
+            const response = await employer.registerCredentialDefinition(schemaId);
+            res.status(200).send(response); 
+        }catch (error: any) {
+            res.status(500).send("Error Occured");
+        }
+    });
+
 
     app.get("/employer/reset", async (req: Request, res: Response) => {
         try {

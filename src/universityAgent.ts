@@ -34,6 +34,7 @@ export class University extends BaseAgent {
     console.log(`Building Univeristy Agent`)
     const port: number = 3001;
     const endpoint = await connect({ addr: port, authtoken_from_env: true });
+    // const endpoint = "https://super-hornet-dynamic.ngrok-free.app";
     console.log(`NgROK Endpoint: ${endpoint}`);
     const universityAgent = new University(port, 'BG University', endpoint)
     await universityAgent.initializeAgent();
@@ -217,7 +218,8 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
         credentialDefinition: {
           schemaId,
           issuerId: this.anonCredsIssuerId,
-          tag: 'latest',
+          // tag: 'latest',
+          tag: 'Degree_Certificate',
         },
         options: {
           supportRevocation: false,

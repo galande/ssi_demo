@@ -48,7 +48,7 @@ export class University extends BaseAgent {
     // and store the existing did in the wallet
     // indy did is based on private key (seed)
     await this.agent.dids.import({
-      did : universityDid,
+      did: universityDid,
       overwrite: true,
       privateKeys: [
         {
@@ -61,24 +61,8 @@ export class University extends BaseAgent {
     this.anonCredsIssuerId = universityDid
   }
 
-  private async getConnectionRecord() {
-    if (!this.outOfBandId) {
-      throw Error(Output.MissingConnectionRecord)
-    }
-
-    const [connection] = await this.agent.connections.findAllByOutOfBandId(this.outOfBandId)
-
-    if (!connection) {
-      throw Error(Output.MissingConnectionRecord)
-    }
-
-    return connection
-  }
-
   public async getAllConnectionRecord() {
-    
     const connection = await this.agent.connections.getAll()
-
     return connection
   }
 
@@ -88,73 +72,35 @@ export class University extends BaseAgent {
     return {
       invitationUrl: outOfBand.outOfBandInvitation.toUrl({ domain: this.endpoint }),
       outOfBand,
-    }   
+    }
   }
 
-  public async waitForConnection() {
-    if (!this.outOfBandId) {
-      throw new Error(Output.MissingConnectionRecord)
-    }
+  //Callback to call when connection established
+  public async setupConnectionListener(outOfBandRecord: OutOfBandRecord, cb: (...args: any) => void) {
+    this.agent.events.on<ConnectionStateChangedEvent>(ConnectionEventTypes.ConnectionStateChanged, ({ payload }) => {
+      if (payload.connectionRecord.outOfBandId !== outOfBandRecord.id) return
+      if (payload.connectionRecord.state === DidExchangeState.Completed) {
+        // the connection is now ready for usage in other protocols!
+        console.log(`Connection for out-of-band id ${outOfBandRecord.id} completed`)
 
-    console.log('Waiting for Alice to finish connection...')
+        // Custom business logic can be included here
+        // In this example we can send a basic message to the connection, but
+        // anything is possible
+        cb()
 
-    const getConnectionRecord = (outOfBandId: string) =>
-      new Promise<ConnectionRecord>((resolve, reject) => {
-        // Timeout of 20 seconds
-        const timeoutId = setTimeout(() => reject(new Error(Output.MissingConnectionRecord)), 20000)
+        // We exit the flow
+        // process.exit(0)
+      }
+    })
 
-        // Start listener
-        this.agent.events.on<ConnectionStateChangedEvent>(ConnectionEventTypes.ConnectionStateChanged, (e) => {
-          if (e.payload.connectionRecord.outOfBandId !== outOfBandId) return
+  };
 
-          clearTimeout(timeoutId)
-          resolve(e.payload.connectionRecord)
-        })
-
-        // Also retrieve the connection record by invitation if the event has already fired
-        void this.agent.connections.findAllByOutOfBandId(outOfBandId).then(([connectionRecord]) => {
-          if (connectionRecord) {
-            clearTimeout(timeoutId)
-            resolve(connectionRecord)
-          }
-        })
-      })
-
-    const connectionRecord = await getConnectionRecord(this.outOfBandId)
-
-    try {
-      await this.agent.connections.returnWhenIsConnected(connectionRecord.id)
-    } catch (e) {
-      console.log(`\nTimeout of 20 seconds reached.. Returning to home screen.\n`)
-      return
-    }
-    console.log(Output.ConnectionEstablished)
-  }
-
-  public async setupConnectionListener (outOfBandRecord: OutOfBandRecord, cb: (...args: any) => void) {
-  this.agent.events.on<ConnectionStateChangedEvent>(ConnectionEventTypes.ConnectionStateChanged, ({ payload }) => {
-    if (payload.connectionRecord.outOfBandId !== outOfBandRecord.id) return
-    if (payload.connectionRecord.state === DidExchangeState.Completed) {
-      // the connection is now ready for usage in other protocols!
-      console.log(`Connection for out-of-band id ${outOfBandRecord.id} completed`)
-
-      // Custom business logic can be included here
-      // In this example we can send a basic message to the connection, but
-      // anything is possible
-      cb()
-
-      // We exit the flow
-      // process.exit(0)
-    }
-  })
-
-};
-
-public async setupCredentialListener (connectionId: string, cb: (...args: any) => void) {
-  console.log("Listning for credential state changes")
-  this.agent.events.on<CredentialStateChangedEvent>(CredentialEventTypes.CredentialStateChanged, ({ payload }) => {
-    // if (payload.credentialRecord.id !== connectionId) return
-    // if (payload.credentialRecord.state === cre) {
+  // Callback to execute when credentials status changes.
+  public async setupCredentialListener(connectionId: string, cb: (...args: any) => void) {
+    console.log("Listning for credential state changes")
+    this.agent.events.on<CredentialStateChangedEvent>(CredentialEventTypes.CredentialStateChanged, ({ payload }) => {
+      // if (payload.credentialRecord.id !== connectionId) return
+      // if (payload.credentialRecord.state === cre) {
       // the connection is now ready for usage in other protocols!
       console.log(`Credential call back`)
       console.log(payload.credentialRecord);
@@ -166,18 +112,13 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
 
       // We exit the flow
       // process.exit(0)
-    // }
-  })
-
-  
-};
-
-  public async setupConnection() {
-    await this.getConnectionInvite()
-    await this.waitForConnection()
-  }
+      // }
+    })
 
 
+  };
+
+  // Register Schema of Degree Certificate
   public async registerSchema() {
     if (!this.anonCredsIssuerId) {
       throw new Error('Missing anoncreds issuerId')
@@ -189,7 +130,7 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
       attrNames: ['registration_number', 'first_name', 'last_name', 'degree', 'status', 'year', 'average'],
       issuerId: this.anonCredsIssuerId,
     }
-    
+
 
     const { schemaState } = await this.agent.modules.anoncreds.registerSchema<IndyVdrRegisterSchemaOptions>({
       schema: schemaTemplate,
@@ -208,6 +149,7 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
     return schemaState
   }
 
+  //Register credential definition for degree certificate
   public async registerCredentialDefinition(schemaId: string) {
     if (!this.anonCredsIssuerId) {
       throw new Error('Missing anoncreds issuerId')
@@ -230,8 +172,7 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
 
     if (credentialDefinitionState.state !== 'finished') {
       throw new Error(
-        `Error registering credential definition: ${
-          credentialDefinitionState.state === 'failed' ? credentialDefinitionState.reason : 'Not Finished'
+        `Error registering credential definition: ${credentialDefinitionState.state === 'failed' ? credentialDefinitionState.reason : 'Not Finished'
         }}`
       )
     }
@@ -240,16 +181,17 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
     return this.credentialDefinition
   }
 
-  public async issueCredential( connectionId: string,
-    credDefId : string, 
-    registration_number : string, 
-    first_name : string,
-    last_name : string,
-    degree : string,
-    status : string,
-    year : string,
-    average : string ) {
-  
+  //Issue credentials to connection
+  public async issueCredential(connectionId: string,
+    credDefId: string,
+    registration_number: string,
+    first_name: string,
+    last_name: string,
+    degree: string,
+    status: string,
+    year: string,
+    average: string) {
+
     const credentialRecord = await this.agent.credentials.offerCredential({
       connectionId: connectionId,
       protocolVersion: 'v2',
@@ -276,63 +218,18 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
     return credentialRecord;
   }
 
-
-  private async newProofAttribute() {
-    const proofAttribute = {
-      name: {
-        name: 'name',
-        restrictions: [
-          {
-            cred_def_id: this.credentialDefinition?.credentialDefinitionId,
-          },
-        ],
-      },
-    }
-
-    return proofAttribute
-  }
-
-  public async sendProofRequest() {
-    const connectionRecord = await this.getConnectionRecord()
-    const proofAttribute = await this.newProofAttribute()
-
-    await this.agent.proofs.requestProof({
-      protocolVersion: 'v2',
-      connectionId: connectionRecord.id,
-      proofFormats: {
-        anoncreds: {
-          name: 'proof-request',
-          version: '1.0',
-          requested_attributes: proofAttribute,
-        },
-      },
-    })
-    // this.ui.updateBottomBar(
-    //   `\nProof request sent!\n\nGo to the Alice agent to accept the proof request\n\n${Color.Reset}`
-    // )
-  }
-
-  public async sendMessage(message: string) {
-    const connectionRecord = await this.getConnectionRecord()
-    await this.agent.basicMessages.sendMessage(connectionRecord.id, message)
-  }
-
-  public async exit() {
-    console.log(Output.Exit)
-    await this.agent.shutdown()
-    process.exit(0)
-  }
-
+  //Restart the Agent
   public async restart() {
     await this.agent.shutdown()
   }
 
+  //Reset the agent. It deletes the all previous connections, credentials and proofs
   public async reset() {
     const connections = await this.agent.connections.getAll();
     for (const connection of connections) {
       await this.agent.connections.deleteById(connection.id);
     }
-    
+
     const credentials = await this.agent.credentials.getAll();
     for (const credential of credentials) {
       await this.agent.credentials.deleteById(credential.id);
@@ -344,8 +241,3 @@ public async setupCredentialListener (connectionId: string, cb: (...args: any) =
     }
   }
 }
-
-function importDid() {
-  throw new Error("Function not implemented.")
-}
-

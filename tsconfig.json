@@ -5,8 +5,8 @@
     "emitDecoratorMetadata": true,
 
     "module": "commonjs",
-
-    "outDir": "./build",
+    "rootDir": "./src",
+    "outDir": "./dist",
 
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true /* Ensure that casing is correct in imports. */,

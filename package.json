@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "NGROK_AUTHTOKEN=2hYcHXnWUpA9LNtqpQ87HNC0I4R_2jYz265o2hQJNRQZcK9u ts-node app.ts",
+    "build": "tsc",
+    "start": "NGROK_AUTHTOKEN=2hYcHXnWUpA9LNtqpQ87HNC0I4R_2jYz265o2hQJNRQZcK9u node dist/app.js",
     "dev": "NGROK_AUTHTOKEN=2hYcHXnWUpA9LNtqpQ87HNC0I4R_2jYz265o2hQJNRQZcK9u tsnd app.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "refresh": "rm -rf ./node_modules ./yarn.lock && yarn"
